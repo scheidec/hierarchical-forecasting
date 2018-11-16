@@ -13,7 +13,7 @@ class: center, middle, inverse, title-slide
 
 # Hierarchical Time Series Forecasting
 ### Caleb Scheidel
-### 2018/10/31
+### 2018/11/30
 
 ---
 
@@ -42,6 +42,98 @@ background-color: #fafaef
 
 - More detail on "hierarchical" structure
   - visualize an example
+
+---
+
+## Optimal Combination
+
+- Proposed by Hyndman, et al (2011)
+
+---
+
+## Trace Minimization
+
+- Proposed by Hyndman, et al (2018)
+
+---
+
+## `hts` package
+
+
+
+---
+
+## Bottom-up method
+
+- Advantage: no information is lost due to aggregation
+- Disadvantage: bottom-level data can be quite noisy and more challenging to model and forecast
+
+---
+
+## Top-down method
+
+- Average historical proportions
+- Proportions of the historical averages
+- Forecasted proportions
+  - first generate _h_-step-ahead base forecasts for all the series independently
+  - at level 1 we calculate the proportion of each _h_-step-ahead base forecasts
+
+---
+
+## Top-down method
+
+
+```r
+library(hts)
+
+bts &lt;- ts(5 + matrix(sort(rnorm(500)), ncol = 5, nrow = 100))
+
+y &lt;- hts(bts, nodes = list(2, c(3, 2)))
+```
+
+```
+## Since argument characters are not specified, the default labelling system is used.
+```
+
+```r
+ally &lt;- aggts(y)
+somey &lt;- aggts(y, levels = c(0, 2))
+S &lt;- smatrix(y)
+
+infantforecast &lt;- forecast(infantgts, h = 10, method = "bu")
+
+fcasts1.td &lt;- forecast(
+  htseg1, h = 4, method = "tdfp", fmethod = "arima", keep.fitted = TRUE
+)
+```
+
+---
+
+## Top-down method
+
+
+```r
+fcasts1.td
+```
+
+```
+## Hierarchical Time Series 
+## 3 Levels 
+## Number of nodes at each level: 1 2 5 
+## Total number of series: 8 
+## Number of observations in each historical series: 10 
+## Number of forecasts per series: 4 
+## Top level series of forecasts: 
+## Time Series:
+## Start = 2002 
+## End = 2005 
+## Frequency = 1 
+## [1] 53.71128 54.20760 54.70392 55.20024
+```
+
+---
+
+## Middle-out method
     </textarea>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
 <script>var slideshow = remark.create({
