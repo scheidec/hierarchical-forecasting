@@ -60,6 +60,10 @@ background-color: #fafaef
 ## `hts` package
 
 
+```r
+library(hts)
+```
+
 
 ---
 
@@ -73,67 +77,97 @@ background-color: #fafaef
 ## Top-down method
 
 - Average historical proportions
+  - Each proportion reflects the average of the historical proportions of the bottom-level series over the period _t_ relative to the total aggregate `\(y_{t}\)`
+  
 - Proportions of the historical averages
+  - Each proportion captures the average historical value of the bottom-level series relative to the average value of the total aggregate `\(y_{t}\)`
+
 - Forecasted proportions
   - first generate _h_-step-ahead base forecasts for all the series independently
   - at level 1 we calculate the proportion of each _h_-step-ahead base forecasts
 
 ---
 
-## Top-down method
-
-
-```r
-library(hts)
-
-bts &lt;- ts(5 + matrix(sort(rnorm(500)), ncol = 5, nrow = 100))
-
-y &lt;- hts(bts, nodes = list(2, c(3, 2)))
-```
-
-```
-## Since argument characters are not specified, the default labelling system is used.
-```
-
-```r
-ally &lt;- aggts(y)
-somey &lt;- aggts(y, levels = c(0, 2))
-S &lt;- smatrix(y)
-
-infantforecast &lt;- forecast(infantgts, h = 10, method = "bu")
-
-fcasts1.td &lt;- forecast(
-  htseg1, h = 4, method = "tdfp", fmethod = "arima", keep.fitted = TRUE
-)
-```
-
----
-
-## Top-down method
-
-
-```r
-fcasts1.td
-```
-
-```
-## Hierarchical Time Series 
-## 3 Levels 
-## Number of nodes at each level: 1 2 5 
-## Total number of series: 8 
-## Number of observations in each historical series: 10 
-## Number of forecasts per series: 4 
-## Top level series of forecasts: 
-## Time Series:
-## Start = 2002 
-## End = 2005 
-## Frequency = 1 
-## [1] 53.71128 54.20760 54.70392 55.20024
-```
-
----
-
 ## Middle-out method
+
+- Combines bottom-up and top-down approaches
+    - "middle level" is chosen and base forecasts are generated for all the series of this level and below
+    - for series above the middle level, forecasts are generated using bottom up approach by aggregating the "middle level" base forecasts upwards
+
+---
+
+## US National Parks Visitor Data
+
+
+```r
+nps &lt;- read_csv("../data/All National Parks Visitation 1904-2016.csv") %&gt;% 
+  janitor::clean_names() %&gt;% 
+  select(park_name = unit_name,
+         park_code = unit_code,
+         park_type = unit_type,
+         state,
+         region,
+         year      = year_raw,
+         visitors) %&gt;% 
+  arrange(year) %&gt;% 
+  filter(year != "Total") %&gt;% 
+  mutate(year = as.numeric(year)) %&gt;% 
+  filter(park_type == "National Park") %&gt;% 
+  filter(park_name != "Denali National Preserve") %&gt;%
+  as_tsibble(index = year, key = id(park_code))
+```
+
+---
+
+
+```r
+# by park
+nps %&gt;% 
+  ggplot(aes(x = year, y = visitors, colour = park_code)) +
+  geom_line()
+```
+
+![](hierarchical-forecasting_files/figure-html/unnamed-chunk-3-1.png)&lt;!-- --&gt;
+
+---
+
+
+```r
+# by state
+nps %&gt;% 
+  group_by(state, year) %&gt;% 
+  summarise(visitors = sum(visitors)) %&gt;% 
+  ggplot(aes(x = year, y = visitors, colour = state)) +
+  geom_line()
+```
+
+![](hierarchical-forecasting_files/figure-html/unnamed-chunk-4-1.png)&lt;!-- --&gt;
+
+---
+
+
+```r
+# by region
+nps %&gt;% 
+  group_by(region, year) %&gt;% 
+  summarise(visitors = sum(visitors)) %&gt;% 
+  ggplot(aes(x = year, y = visitors, colour = region)) +
+  geom_line()
+```
+
+![](hierarchical-forecasting_files/figure-html/unnamed-chunk-5-1.png)&lt;!-- --&gt;
+
+---
+
+## Data
+
+Divide the data into two parts, the first 90% of each series use as the training set for estimating parameters and the last 10% as a test set.  Are the differences in the forecasting results statistically significant?
+
+---
+
+## Other Methods
+
+It is possible to forecast all series at all levels independently, but this has the undesirable consequence of the higher level forecasts not being equal to the sum of the lower level forecasts.  Adjustments can be done in an ad-hoc manner, but prediction intervals cannot be computed.
     </textarea>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
 <script>var slideshow = remark.create({

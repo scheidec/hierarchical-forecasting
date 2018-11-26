@@ -23,8 +23,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(forecast)
-library(hts)
 library(skimr)
+library(tsibble)
 ```
 
 ---
@@ -62,6 +62,9 @@ library(skimr)
 
 ## `hts` package
 
+```{r}
+library(hts)
+```
 
 
 ---
@@ -76,42 +79,86 @@ library(skimr)
 ## Top-down method
 
 - Average historical proportions
+  - Each proportion reflects the average of the historical proportions of the bottom-level series over the period _t_ relative to the total aggregate $y_{t}$
+  
 - Proportions of the historical averages
+  - Each proportion captures the average historical value of the bottom-level series relative to the average value of the total aggregate $y_{t}$
+
 - Forecasted proportions
   - first generate _h_-step-ahead base forecasts for all the series independently
   - at level 1 we calculate the proportion of each _h_-step-ahead base forecasts
 
 ---
 
-## Top-down method
-
-```{r}
-
-library(hts)
-
-bts <- ts(5 + matrix(sort(rnorm(500)), ncol = 5, nrow = 100))
-
-y <- hts(bts, nodes = list(2, c(3, 2)))
-
-ally <- aggts(y)
-somey <- aggts(y, levels = c(0, 2))
-S <- smatrix(y)
-
-infantforecast <- forecast(infantgts, h = 10, method = "bu")
-
-fcasts1.td <- forecast(
-  htseg1, h = 4, method = "tdfp", fmethod = "arima", keep.fitted = TRUE
-)
-```
-
----
-
-## Top-down method
-
-```{r}
-fcasts1.td
-```
-
----
-
 ## Middle-out method
+
+- Combines bottom-up and top-down approaches
+  - "middle level" is chosen and base forecasts are generated for all the series of this level and below
+  - for series above the middle level, forecasts are generated using bottom up approach by aggregating the "middle level" base forecasts upwards
+
+---
+
+## US National Parks Visitor Data
+
+```{r, message=FALSE}
+
+nps <- read_csv("../data/All National Parks Visitation 1904-2016.csv") %>% 
+  janitor::clean_names() %>% 
+  select(park_name = unit_name,
+         park_code = unit_code,
+         park_type = unit_type,
+         state,
+         region,
+         year      = year_raw,
+         visitors) %>% 
+  arrange(year) %>% 
+  filter(year != "Total") %>% 
+  mutate(year = as.numeric(year)) %>% 
+  filter(park_type == "National Park") %>% 
+  filter(park_name != "Denali National Preserve") %>%
+  as_tsibble(index = year, key = id(park_code))
+```
+
+---
+
+```{r}
+
+# by park
+nps %>% 
+  ggplot(aes(x = year, y = visitors, colour = park_code)) +
+  geom_line()
+```
+
+---
+
+```{r}
+# by state
+nps %>% 
+  group_by(state, year) %>% 
+  summarise(visitors = sum(visitors)) %>% 
+  ggplot(aes(x = year, y = visitors, colour = state)) +
+  geom_line()
+```
+
+---
+
+```{r}
+# by region
+nps %>% 
+  group_by(region, year) %>% 
+  summarise(visitors = sum(visitors)) %>% 
+  ggplot(aes(x = year, y = visitors, colour = region)) +
+  geom_line()
+```
+
+---
+
+## Data
+
+Divide the data into two parts, the first 90% of each series use as the training set for estimating parameters and the last 10% as a test set.  Are the differences in the forecasting results statistically significant?
+
+---
+
+## Other Methods
+
+It is possible to forecast all series at all levels independently, but this has the undesirable consequence of the higher level forecasts not being equal to the sum of the lower level forecasts.  Adjustments can be done in an ad-hoc manner, but prediction intervals cannot be computed.
