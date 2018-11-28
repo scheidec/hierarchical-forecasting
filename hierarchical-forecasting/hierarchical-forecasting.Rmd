@@ -48,57 +48,10 @@ library(tsibble)
 
 ---
 
-## Optimal Combination
-
-- Proposed by Hyndman, et al (2011)
-
----
-
-## Trace Minimization
-
-- Proposed by Hyndman, et al (2018)
-
----
-
-## `hts` package
-
-```{r}
-library(hts)
-```
-
-
----
-
-## Bottom-up method
-
-- Advantage: no information is lost due to aggregation
-- Disadvantage: bottom-level data can be quite noisy and more challenging to model and forecast
-
----
-
-## Top-down method
-
-- Average historical proportions
-  - Each proportion reflects the average of the historical proportions of the bottom-level series over the period _t_ relative to the total aggregate $y_{t}$
-  
-- Proportions of the historical averages
-  - Each proportion captures the average historical value of the bottom-level series relative to the average value of the total aggregate $y_{t}$
-
-- Forecasted proportions
-  - first generate _h_-step-ahead base forecasts for all the series independently
-  - at level 1 we calculate the proportion of each _h_-step-ahead base forecasts
-
----
-
-## Middle-out method
-
-- Combines bottom-up and top-down approaches
-  - "middle level" is chosen and base forecasts are generated for all the series of this level and below
-  - for series above the middle level, forecasts are generated using bottom up approach by aggregating the "middle level" base forecasts upwards
-
----
-
 ## US National Parks Visitor Data
+
+- From: https://data.world/inform8n/us-national-parks-visitation-1904-2016-with-boundaries
+  - scraped from source here: https://irma.nps.gov/Stats/SSRSReports/National%20Reports/Annual%20Summary%20Report%20(1904%20-%20Last%20Calendar%20Year)
 
 ```{r, message=FALSE}
 
@@ -153,12 +106,121 @@ nps %>%
 
 ---
 
-## Data
+## `hts` package
 
-Divide the data into two parts, the first 90% of each series use as the training set for estimating parameters and the last 10% as a test set.  Are the differences in the forecasting results statistically significant?
+```{r}
+library(hts)
+```
+
+---
+
+## Bottom-up method
+
+- Advantage: no information is lost due to aggregation
+- Disadvantage: bottom-level data can be quite noisy and more challenging to model and forecast
+
+---
+
+## Top-down method
+
+- Average historical proportions
+  - Each proportion reflects the average of the historical proportions of the bottom-level series over the period _t_ relative to the total aggregate $y_{t}$
+  
+- Proportions of the historical averages
+  - Each proportion captures the average historical value of the bottom-level series relative to the average value of the total aggregate $y_{t}$
+
+- Forecasted proportions
+  - first generate _h_-step-ahead base forecasts for all the series independently
+  - at level 1 we calculate the proportion of each _h_-step-ahead base forecasts
+
+---
+
+## Middle-out method
+
+- Combines bottom-up and top-down approaches
+  - "middle level" is chosen and base forecasts are generated for all the series of this level and below
+  - for series above the middle level, forecasts are generated using bottom up approach by aggregating the "middle level" base forecasts upwards
 
 ---
 
 ## Other Methods
 
-It is possible to forecast all series at all levels independently, but this has the undesirable consequence of the higher level forecasts not being equal to the sum of the lower level forecasts.  Adjustments can be done in an ad-hoc manner, but prediction intervals cannot be computed.
+- It is possible to forecast all series at all levels independently, but this has the undesirable consequence of the higher level forecasts not being equal to the sum of the lower level forecasts.  Adjustments can be done in an ad-hoc manner, but prediction intervals cannot be computed.
+
+- Forecast reconciliation
+  - can be used for h or g time series
+  - clusters may be correlated
+  - prediction intervals can be computed
+
+---
+
+## Other Methods
+
+- Optimal Combination
+- Trace Minimization
+  
+---  
+  
+## Optimal Combination
+
+- Proposed by Hyndman, et al (2011)
+  - allows optimal point forecasts to be produced
+  - advantages:
+    - base forecasts can come from any model, or can be judgemental forecasts
+      - ad-hoc adjustments can be incorporated
+      
+---
+
+## Trace Minimization
+
+- Proposed by Hyndman, et al (2018)
+- `hts::MinT()` function
+
+---
+
+Setting up the `hts` object.
+
+```{r}
+
+nps_ts <- nps %>%
+  as_tibble() %>%
+  arrange(region, state) %>% 
+  mutate(park_code = paste0(region, state, park_code)) %>% 
+  select(park_code, year, visitors) %>%
+  spread(park_code, visitors) %>% 
+  as_tsibble(index = "year") %>% 
+  as.ts()
+
+nps_hts <- hts(nps_ts,
+               characters = c(2, 2, 4))
+
+names(nps_hts$labels) <- c("Total", "Region", "State", "Park")
+```
+
+---
+
+Now we can forecast.
+
+```{r, results = "hide", warning = FALSE}
+
+nps_fcasts <- forecast(
+  nps_hts,
+  h = 5,                  # forecast next 5 years (2017-2021)
+  method = "comb",        # optimal combination
+  fmethod = "ets",        # exponential smoothing
+  keep.fitted = TRUE,
+  keep.resid = TRUE
+)
+
+metrics <- nps_fcasts %>% 
+  summary() %>% 
+  broom::tidy() %>% 
+  rename(metric = .rownames)
+```
+
+---
+
+```{r}
+plot(nps_fcasts)
+```
+
