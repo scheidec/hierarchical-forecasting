@@ -256,12 +256,37 @@ metrics %&gt;%
 
 ---
 
+Now we can forecast.
+
+
+```r
+nps_fcasts &lt;- forecast(
+  nps_hts,
+  h = 5,                  # forecast next 5 years (2017-2021)
+  method = "tdfp",        # top-down forecast proportions
+  fmethod = "arima",      # ARIMA
+  keep.fitted = TRUE,
+  keep.resid = TRUE
+)
+
+metrics &lt;- nps_fcasts %&gt;% 
+  summary() %&gt;% 
+  broom::tidy() %&gt;% 
+  rename(metric = .rownames)
+
+metrics %&gt;%
+  mutate(park = "SENCGRSM") %&gt;% 
+  select(park, metric, `Top-down Forecast Proportions` = SENCGRSM)
+```
+
+---
+
 
 ```r
 plot(nps_fcasts, levels = c(0, 1))
 ```
 
-![](hierarchical-forecasting_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+![](hierarchical-forecasting_files/figure-html/unnamed-chunk-9-1.png)&lt;!-- --&gt;
 
 ---
 
@@ -270,7 +295,7 @@ plot(nps_fcasts, levels = c(0, 1))
 plot(nps_fcasts, levels = c(2, 3))
 ```
 
-![](hierarchical-forecasting_files/figure-html/unnamed-chunk-9-1.png)&lt;!-- --&gt;
+![](hierarchical-forecasting_files/figure-html/unnamed-chunk-10-1.png)&lt;!-- --&gt;
     </textarea>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
 <script>var slideshow = remark.create({
