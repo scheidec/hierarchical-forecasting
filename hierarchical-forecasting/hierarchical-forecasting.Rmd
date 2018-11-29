@@ -30,27 +30,51 @@ library(tsibble)
 
 ## Motivation
 
-- Why would we be interested in hierarchically structured time series?
+- In many applications time series can be organized in a hierarchical structure
+  - e.g. by geography, product types, market segments
+    - data that can be _disaggregated_ 
 
----
-
-# Forecasting
-
-- General overview of forecasting
+- It is common to produce disaggregated forecasts based on the bottom-level time series, but what if we wanted to also forecast the intermediate and top-level series?
+  - We would expect the forecasts to be _coherent_
+    - add up in a manner that is consistent with the hierarchical structure
 
 ---
 
 ## Hierarchical Time Series
 
-- More detail on "hierarchical" structure
-  - visualize an example
+![](two-level-hierarchical-diagram.png)
+
+- AA + AB + AC = A
+
+- A + B = Total
+
+---
+
+## Hierarchical Time Series
+
+For any time _t_, the observations of the bottom-level series will aggregate to the observations of the series above.
+
+- *S* matrix
+
+![](s-matrix.png)
+
+
+---
+
+## Methods
+
+- Top-down
+- Bottom-up
+- Middle-out
+- Optimal Combination
+- Trace Minimization
 
 ---
 
 ## US National Parks Visitor Data
 
 - From: https://data.world/inform8n/us-national-parks-visitation-1904-2016-with-boundaries
-  - scraped from source here: https://irma.nps.gov/Stats/SSRSReports/National%20Reports/Annual%20Summary%20Report%20(1904%20-%20Last%20Calendar%20Year)
+  - scraped from source [here](https://irma.nps.gov/Stats/SSRSReports/National%20Reports/Annual%20Summary%20Report%20(1904%20-%20Last%20Calendar%20Year)
 
 ```{r, message=FALSE}
 
@@ -67,8 +91,8 @@ nps <- read_csv("../data/All National Parks Visitation 1904-2016.csv") %>%
   filter(year != "Total") %>% 
   mutate(year = as.numeric(year)) %>% 
   filter(park_type == "National Park") %>% 
-  filter(park_name != "Denali National Preserve") %>%
-  as_tsibble(index = year, key = id(park_code))
+  filter(park_name != "Denali National Preserve") # duplicate
+  #as_tsibble(index = year, key = id(park_code))
 ```
 
 ---
@@ -186,7 +210,6 @@ Setting up the `hts` object.
 ```{r}
 
 nps_ts <- nps %>%
-  as_tibble() %>%
   arrange(region, state) %>% 
   mutate(park_code = paste0(region, state, park_code)) %>% 
   select(park_code, year, visitors) %>%
@@ -219,11 +242,45 @@ metrics <- nps_fcasts %>%
   summary() %>% 
   broom::tidy() %>% 
   rename(metric = .rownames)
+
+metrics %>%
+  mutate(park = "SENCGRSM") %>% 
+  select(park, metric, `Optimal Combination` = SENCGRSM)
+```
+
+---
+
+Now we can forecast.
+
+```{r, results = "hide", warning = FALSE}
+
+nps_fcasts <- forecast(
+  nps_hts,
+  h = 5,                  # forecast next 5 years (2017-2021)
+  method = "tdfp",        # top-down forecast proportions
+  fmethod = "arima",      # ARIMA
+  keep.fitted = TRUE,
+  keep.resid = TRUE
+)
+
+metrics <- nps_fcasts %>% 
+  summary() %>% 
+  broom::tidy() %>% 
+  rename(metric = .rownames)
+
+metrics %>%
+  mutate(park = "SENCGRSM") %>% 
+  select(park, metric, `Top-down Forecast Proportions` = SENCGRSM)
 ```
 
 ---
 
 ```{r, fig.width = 10}
-plot(nps_fcasts)
+plot(nps_fcasts, levels = c(0, 1))
 ```
 
+---
+
+```{r, fig.width = 10}
+plot(nps_fcasts, levels = c(2, 3))
+```

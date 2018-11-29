@@ -28,27 +28,51 @@ background-color: #fafaef
 
 ## Motivation
 
-- Why would we be interested in hierarchically structured time series?
+- In many applications time series can be organized in a hierarchical structure
+  - e.g. by geography, product types, market segments
+    - data that can be _disaggregated_ 
 
----
-
-# Forecasting
-
-- General overview of forecasting
+- It is common to produce disaggregated forecasts based on the bottom-level time series, but what if we wanted to also forecast the intermediate and top-level series?
+  - We would expect the forecasts to be _coherent_
+    - add up in a manner that is consistent with the hierarchical structure
 
 ---
 
 ## Hierarchical Time Series
 
-- More detail on "hierarchical" structure
-  - visualize an example
+![](two-level-hierarchical-diagram.png)
+
+- AA + AB + AC = A
+
+- A + B = Total
+
+---
+
+## Hierarchical Time Series
+
+For any time _t_, the observations of the bottom-level series will aggregate to the observations of the series above.
+
+- *S* matrix
+
+![](s-matrix.png)
+
+
+---
+
+## Methods
+
+- Top-down
+- Bottom-up
+- Middle-out
+- Optimal Combination
+- Trace Minimization
 
 ---
 
 ## US National Parks Visitor Data
 
 - From: https://data.world/inform8n/us-national-parks-visitation-1904-2016-with-boundaries
-  - scraped from source here: https://irma.nps.gov/Stats/SSRSReports/National%20Reports/Annual%20Summary%20Report%20(1904%20-%20Last%20Calendar%20Year)
+  - scraped from source [here](https://irma.nps.gov/Stats/SSRSReports/National%20Reports/Annual%20Summary%20Report%20(1904%20-%20Last%20Calendar%20Year)
 
 
 ```r
@@ -65,8 +89,8 @@ nps &lt;- read_csv("../data/All National Parks Visitation 1904-2016.csv") %&gt;%
   filter(year != "Total") %&gt;% 
   mutate(year = as.numeric(year)) %&gt;% 
   filter(park_type == "National Park") %&gt;% 
-  filter(park_name != "Denali National Preserve") %&gt;%
-  as_tsibble(index = year, key = id(park_code))
+  filter(park_name != "Denali National Preserve") # duplicate
+  #as_tsibble(index = year, key = id(park_code))
 ```
 
 ---
@@ -192,7 +216,6 @@ Setting up the `hts` object.
 
 ```r
 nps_ts &lt;- nps %&gt;%
-  as_tibble() %&gt;%
   arrange(region, state) %&gt;% 
   mutate(park_code = paste0(region, state, park_code)) %&gt;% 
   select(park_code, year, visitors) %&gt;%
@@ -225,16 +248,29 @@ metrics &lt;- nps_fcasts %&gt;%
   summary() %&gt;% 
   broom::tidy() %&gt;% 
   rename(metric = .rownames)
+
+metrics %&gt;%
+  mutate(park = "SENCGRSM") %&gt;% 
+  select(park, metric, `Optimal Combination` = SENCGRSM)
 ```
 
 ---
 
 
 ```r
-plot(nps_fcasts)
+plot(nps_fcasts, levels = c(0, 1))
 ```
 
 ![](hierarchical-forecasting_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+
+---
+
+
+```r
+plot(nps_fcasts, levels = c(2, 3))
+```
+
+![](hierarchical-forecasting_files/figure-html/unnamed-chunk-9-1.png)&lt;!-- --&gt;
     </textarea>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
 <script>var slideshow = remark.create({
@@ -252,12 +288,23 @@ if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
   d.head.appendChild(s);
 })();</script>
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-  tex2jax: {
-    skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+<script>
+(function() {
+  var i, text, code, codes = document.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
   }
-});
+})();
 </script>
 <!-- dynamically load mathjax for compatibility with self-contained -->
 <script>
