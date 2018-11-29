@@ -23,7 +23,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(forecast)
-library(skimr)
 library(tsibble)
 ```
 
@@ -74,34 +73,38 @@ nps <- read_csv("../data/All National Parks Visitation 1904-2016.csv") %>%
 
 ---
 
-```{r}
+```{r, fig.width=10, fig.height = 6}
 
 # by park
 nps %>% 
   ggplot(aes(x = year, y = visitors, colour = park_code)) +
-  geom_line()
+  geom_line() + theme(legend.position = "bottom") + 
+  guides(colour=guide_legend(ncol=11))
 ```
 
 ---
 
-```{r}
+```{r, fig.width = 10, fig.height = 5.5}
+
 # by state
 nps %>% 
   group_by(state, year) %>% 
   summarise(visitors = sum(visitors)) %>% 
   ggplot(aes(x = year, y = visitors, colour = state)) +
-  geom_line()
+  geom_line() + theme(legend.position = "bottom") +
+  guides(colour=guide_legend(ncol = 11))
 ```
 
 ---
 
-```{r}
+```{r, fig.width = 10, fig.height = 5.5}
 # by region
 nps %>% 
   group_by(region, year) %>% 
   summarise(visitors = sum(visitors)) %>% 
   ggplot(aes(x = year, y = visitors, colour = region)) +
-  geom_line()
+  geom_line() + theme(legend.position = "bottom")+
+  guides(colour=guide_legend(ncol = 7))
 ```
 
 ---
@@ -220,7 +223,7 @@ metrics <- nps_fcasts %>%
 
 ---
 
-```{r}
+```{r, fig.width = 10}
 plot(nps_fcasts)
 ```
 
