@@ -274,24 +274,57 @@ Now we can forecast.
 
 
 ```r
-nps_fcasts &lt;- forecast(
-  nps_hts,
-  h = 5,                  # forecast next 5 years (2017-2021)
-  method = "tdfp",        # top-down forecast proportions
-  fmethod = "arima",      # ARIMA
-  keep.fitted = TRUE,
-  keep.resid = TRUE
-)
+hts_fcast_metrics &lt;- function(hts_obj, h, method, fmethod, park, park_name, level = 2) {
+  
+  park &lt;- enquo(park)
+  
+  nps_fcasts &lt;- forecast(
+    hts_obj,
+    h = h,
+    method = method,        
+    fmethod = fmethod,     
+    keep.fitted = TRUE,
+    keep.resid = TRUE,
+    level = level
+  )
 
-metrics &lt;- nps_fcasts %&gt;% 
-  summary() %&gt;% 
-  broom::tidy() %&gt;% 
-  rename(metric = .rownames)
+  invisible(capture.output(metrics &lt;- summary(nps_fcasts)))
+  
+  metrics &lt;- metrics %&gt;%   
+    broom::tidy() %&gt;% 
+    rename(metric = .rownames) %&gt;% 
+    mutate(park_name = park_name) %&gt;% 
+    select(park_name, metric, !!park) %&gt;%
+    spread(metric, !!park) %&gt;% 
+    mutate(method = method) %&gt;% 
+    select(park_name, method, everything())
 
-metrics %&gt;%
-  mutate(park = "SENCGRSM") %&gt;% 
-  select(park, metric, `Top-down Forecast Proportions` = SENCGRSM)
+  metrics
+} 
 ```
+
+---
+
+
+```r
+hts_methods  &lt;- c("bu",    "tdfp",  "comb", "mo")
+hts_fmethods &lt;- c("arima", "arima", "ets",  "ets")
+
+tbl &lt;- hts_methods %&gt;% 
+  map2_df(hts_fmethods, ~ hts_fcast_metrics(nps_hts, 5, .x, .y, SENCGRSM, "Great Smoky Mountains"))
+
+tbl %&gt;% 
+  knitr::kable()
+```
+
+
+
+park_name               method         MAE        MAPE       MASE          ME         MPE       RMSE
+----------------------  -------  ---------  ----------  ---------  ----------  ----------  ---------
+Great Smoky Mountains   bu        295232.8    8.382227   1.174242     -40.951   -2.452122   411902.5
+Great Smoky Mountains   tdfp      294739.3    8.862291   1.172280    7307.959   -2.587239   415141.1
+Great Smoky Mountains   comb      302983.6   10.228810   1.205070   23087.970    2.536489   423122.6
+Great Smoky Mountains   mo        304404.8   10.319153   1.210723   41336.769    2.958275   420905.5
 
 ---
 
@@ -300,7 +333,7 @@ metrics %&gt;%
 plot(nps_fcasts, levels = c(0, 1))
 ```
 
-![](hierarchical-forecasting_files/figure-html/unnamed-chunk-9-1.png)&lt;!-- --&gt;
+![](hierarchical-forecasting_files/figure-html/unnamed-chunk-10-1.png)&lt;!-- --&gt;
 
 ---
 
@@ -309,11 +342,13 @@ plot(nps_fcasts, levels = c(0, 1))
 plot(nps_fcasts, levels = c(2, 3))
 ```
 
-![](hierarchical-forecasting_files/figure-html/unnamed-chunk-10-1.png)&lt;!-- --&gt;
+![](hierarchical-forecasting_files/figure-html/unnamed-chunk-11-1.png)&lt;!-- --&gt;
 
 ---
 
 ## Conclusions
+
+- Of the methods we examined, _____ performed the best on the NPS Visitor data.
 
 ---
 
@@ -338,12 +373,23 @@ if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
   d.head.appendChild(s);
 })();</script>
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-  tex2jax: {
-    skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+<script>
+(function() {
+  var i, text, code, codes = document.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
   }
-});
+})();
 </script>
 <!-- dynamically load mathjax for compatibility with self-contained -->
 <script>

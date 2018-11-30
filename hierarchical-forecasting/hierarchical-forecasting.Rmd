@@ -268,23 +268,47 @@ Now we can forecast.
 
 ```{r, results = "hide", warning = FALSE}
 
-nps_fcasts <- forecast(
-  nps_hts,
-  h = 5,                  # forecast next 5 years (2017-2021)
-  method = "tdfp",        # top-down forecast proportions
-  fmethod = "arima",      # ARIMA
-  keep.fitted = TRUE,
-  keep.resid = TRUE
-)
+hts_fcast_metrics <- function(hts_obj, h, method, fmethod, park, park_name, level = 2) {
+  
+  park <- enquo(park)
+  
+  nps_fcasts <- forecast(
+    hts_obj,
+    h = h,
+    method = method,        
+    fmethod = fmethod,     
+    keep.fitted = TRUE,
+    keep.resid = TRUE,
+    level = level
+  )
 
-metrics <- nps_fcasts %>% 
-  summary() %>% 
-  broom::tidy() %>% 
-  rename(metric = .rownames)
+  invisible(capture.output(metrics <- summary(nps_fcasts)))
+  
+  metrics <- metrics %>%   
+    broom::tidy() %>% 
+    rename(metric = .rownames) %>% 
+    mutate(park_name = park_name) %>% 
+    select(park_name, metric, !!park) %>%
+    spread(metric, !!park) %>% 
+    mutate(method = method) %>% 
+    select(park_name, method, everything())
 
-metrics %>%
-  mutate(park = "SENCGRSM") %>% 
-  select(park, metric, `Top-down Forecast Proportions` = SENCGRSM)
+  metrics
+} 
+```
+
+---
+
+```{r, warning = FALSE}
+
+hts_methods  <- c("bu",    "tdfp",  "comb", "mo")
+hts_fmethods <- c("arima", "arima", "ets",  "ets")
+
+tbl <- hts_methods %>% 
+  map2_df(hts_fmethods, ~ hts_fcast_metrics(nps_hts, 5, .x, .y, SENCGRSM, "Great Smoky Mountains"))
+
+tbl %>% 
+  knitr::kable()
 ```
 
 ---
@@ -302,6 +326,8 @@ plot(nps_fcasts, levels = c(2, 3))
 ---
 
 ## Conclusions
+
+- Of the methods we examined, _____ performed the best on the NPS Visitor data.
 
 ---
 
