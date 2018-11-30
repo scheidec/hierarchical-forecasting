@@ -28,7 +28,7 @@ library(tsibble)
 
 ---
 
-## Motivation
+## Hierarchical Time Series
 
 - In many applications time series can be organized in a hierarchical structure
   - e.g. by geography, product types, market segments
@@ -67,7 +67,6 @@ For any time _t_, the observations of the bottom-level series will aggregate to 
 - Bottom-up
 - Middle-out
 - Optimal Combination
-- Trace Minimization
 
 ---
 
@@ -92,7 +91,6 @@ nps <- read_csv("../data/All National Parks Visitation 1904-2016.csv") %>%
   mutate(year = as.numeric(year)) %>% 
   filter(park_type == "National Park") %>% 
   filter(park_name != "Denali National Preserve") # duplicate
-  #as_tsibble(index = year, key = id(park_code))
 ```
 
 ---
@@ -143,65 +141,81 @@ library(hts)
 
 ## Bottom-up method
 
+- Forecast bottom-level series, then use aggregation (simple addition) to obtain forecasts at higher levels
+
 - Advantage: no information is lost due to aggregation
-- Disadvantage: bottom-level data can be quite noisy and more challenging to model and forecast
+- Disadvantage: bottom-level data can be noisy and more challenging to forecast
 
 ---
 
 ## Top-down method
 
-- Average historical proportions
-  - Each proportion reflects the average of the historical proportions of the bottom-level series over the period _t_ relative to the total aggregate $y_{t}$
-  
-- Proportions of the historical averages
-  - Each proportion captures the average historical value of the bottom-level series relative to the average value of the total aggregate $y_{t}$
+- Forecast the "total" aggregated series, then disaggregate the forecasts
 
-- Forecasted proportions
-  - first generate _h_-step-ahead base forecasts for all the series independently
-  - at level 1 we calculate the proportion of each _h_-step-ahead base forecasts
+- Advantage: when bottom-level data are noisy, top-down method produces more accurate forecasts
+    - useful with low count data
+- Disadvantage: loss of information due to aggregation
+    - unable to capture individual series characteristics (e.g. special events)
+
+- Several methods (20+) have been developed to disaggregate
+    - average historical proportions
+    - proportions of the historical averages
+    - forecasted proportions
+
+---
+
+## Average historical proportions
+
+- Each proportion, $p_{j}$ reflects the average of the historical proportions of the bottom-level series $y_{j,t}$ over the period _t_ = 1,..., _T_ relative to the total aggregate $y_{t}$
+
+$$
+p_{j} = \frac{1}{T}\sum_{t=1}^{T}{\frac{y_{j,t}}{y_{t}}}
+$$
+  
+---
+
+## Proportions of the historical averages
+        
+- Each proportion $p_{j}$ captures the average historical value of the bottom-level series $y{j,t}$ relative to the average value of the total aggregate $y_{t}$
+
+$$
+p_{j} = \sum_{t=1}^{T}{\frac{y_{j,t}}{T}} / \sum_{t=1}^{T}{\frac{y_{t}}{T}}
+$$
+
+---
+
+## Forecasted proportions
+
+- Developed by Athanasopoulos et al (2009)
+
+1. first generate _h_-step-ahead base forecasts for all the series independently
+2. starting from the top level, we calculate the proportion of each _h_-step-ahead base forecast to the aggregate of all the _h_-step-ahead base forecasts at that level
+    - these are the _forecasted proportions_, which are used to disaggregate and generate revised forecasts
+3. for a _K_-level hierarchy, step 2 is repeated for each node going from top to bottom
 
 ---
 
 ## Middle-out method
 
 - Combines bottom-up and top-down approaches
-  - "middle level" is chosen and base forecasts are generated for all the series of this level and below
-  - for series above the middle level, forecasts are generated using bottom up approach by aggregating the "middle level" base forecasts upwards
+    1. "middle level" is chosen and base forecasts are generated for all the series of this level and below
+    2. for series above the middle level, forecasts are generated using bottom up approach by aggregating the middle level base forecasts upwards
+    3. for series below the middle level, revised forecasts are generated using a top-down approach
 
 ---
-
-## Other Methods
-
-- It is possible to forecast all series at all levels independently, but this has the undesirable consequence of the higher level forecasts not being equal to the sum of the lower level forecasts.  Adjustments can be done in an ad-hoc manner, but prediction intervals cannot be computed.
-
-- Forecast reconciliation
-  - can be used for h or g time series
-  - clusters may be correlated
-  - prediction intervals can be computed
-
----
-
-## Other Methods
-
-- Optimal Combination
-- Trace Minimization
-  
----  
   
 ## Optimal Combination
 
 - Proposed by Hyndman, et al (2011)
-  - allows optimal point forecasts to be produced
-  - advantages:
-    - base forecasts can come from any model, or can be judgemental forecasts
-      - ad-hoc adjustments can be incorporated
+
+- advantages:
+    - uses _all_ information available within the hierarchy
+    - allows for correlations and interactions between series at each level of the hierarchy
+    - produces unbiased revised forecasts if base forecasts are unbiased
       
 ---
 
-## Trace Minimization
-
-- Proposed by Hyndman, et al (2018)
-- `hts::MinT()` function
+## Optimal Combination
 
 ---
 
@@ -284,3 +298,16 @@ plot(nps_fcasts, levels = c(0, 1))
 ```{r, fig.width = 10}
 plot(nps_fcasts, levels = c(2, 3))
 ```
+
+---
+
+## Conclusions
+
+---
+
+## Other Methods
+
+- Proposed by Hyndman, et al (2016)
+    - `hts::MinT()` function
+
+
