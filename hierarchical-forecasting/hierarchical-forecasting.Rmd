@@ -283,8 +283,8 @@ nps_fcasts <- forecast(
   h = 12,             # forecast horizon, next 12 years (2005-2016)
   method = "comb",    # optimal combination, method for distributing forecasts within the hierarchy
   fmethod = "ets",    # forecasting method used for each series, exponential smoothing, or "arima" and "rw"
-  keep.fitted = TRUE,
-  keep.resid = TRUE
+  weights = "mint",   # trace minimization full cov estimate to determine weights (as in Wickramasuriya 2018)
+  covariance = "shr"  # covariance matrix, shrinkage estimator with shrinkage towards diagonal
 )
 
 nps_fcasts
@@ -300,6 +300,19 @@ plot(nps_fcasts, levels = c(0, 1))
 
 ```{r, fig.width = 10}
 plot(nps_fcasts, levels = c(2, 3))
+```
+
+---
+
+Are the forecasts coherent?
+
+```{r}
+aggts(nps_fcasts) %>% 
+  as_tibble() %>% 
+  mutate(Year = 2005:2016) %>% 
+  select(Year, Total, contains("NE")) %>% 
+  mutate_if(is.numeric, round, 1) %>% 
+  tail() %>% knitr::kable("html")
 ```
 
 ---
@@ -338,7 +351,9 @@ hts_fcast_metrics <- function(train, test, h, method, fmethod, region) {
     fmethod = fmethod,     
     keep.fitted = TRUE,
     keep.resid = TRUE,
-    level = 2
+    level = 2,
+    weights = "mint",
+    covariance = "shr"
   )
 
   # calculate performance on test set
@@ -404,7 +419,8 @@ tbl %>%
     - `gts()` function
 
 - Prediction intervals are not yet implemented directly in `hts`
-    - though it [looks possible to compute by hand](https://stats.stackexchange.com/questions/303176/building-the-covariance-matrix-for-hts-prediction-intervals)
+    - though it [looks possible to compute for the trace minimization method](https://stats.stackexchange.com/questions/303176/building-the-covariance-matrix-for-hts-prediction-intervals)
+    - the covariance estimator is needed to compute prediction intervals
 
 ---
 
@@ -417,5 +433,3 @@ tbl %>%
 - Hyndman et al (2011) optimal combination [paper](https://robjhyndman.com/papers/Hierarchical6.pdf)
 
 - Wickramasuriya et al (2018) trace minimization [paper](https://robjhyndman.com/papers/mint.pdf)
-
-

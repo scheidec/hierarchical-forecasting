@@ -288,8 +288,8 @@ nps_fcasts &lt;- forecast(
   h = 12,             # forecast horizon, next 12 years (2005-2016)
   method = "comb",    # optimal combination, method for distributing forecasts within the hierarchy
   fmethod = "ets",    # forecasting method used for each series, exponential smoothing, or "arima" and "rw"
-  keep.fitted = TRUE,
-  keep.resid = TRUE
+  weights = "mint",   # trace minimization full cov estimate to determine weights (as in Wickramasuriya 2018)
+  covariance = "shr"  # covariance matrix, shrinkage estimator with shrinkage towards diagonal
 )
 
 nps_fcasts
@@ -307,8 +307,8 @@ nps_fcasts
 ## Start = 2005 
 ## End = 2016 
 ## Frequency = 1 
-##  [1] 64857223 65192658 65525673 65856785 66186405 66514856 66842396
-##  [8] 67169227 67495511 67821373 68146912 68472207
+##  [1] 64880582 65180426 65475738 65767492 66056461 66343256 66628358
+##  [8] 66912146 67194921 67476918 67758319 68039270
 ```
 
 ---
@@ -328,6 +328,90 @@ plot(nps_fcasts, levels = c(2, 3))
 ```
 
 ![](hierarchical-forecasting_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+
+---
+
+Are the forecasts coherent?
+
+
+```r
+aggts(nps_fcasts) %&gt;% 
+  as_tibble() %&gt;% 
+  mutate(Year = 2005:2016) %&gt;% 
+  select(Year, Total, contains("NE")) %&gt;% 
+  mutate_if(is.numeric, round, 1) %&gt;% 
+  tail() %&gt;% knitr::kable("html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; Year &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; Total &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NE &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEME &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEVA &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEMEACAD &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEVASHEN &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2011 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 66628358 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3549296 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2306334 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1242962 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2306334 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1242962 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2012 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 66912146 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3554430 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2313095 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1241335 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2313095 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1241335 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2013 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 67194922 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3559576 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2319806 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1239770 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2319806 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1239770 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2014 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 67476918 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3564727 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2326472 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1238255 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2326472 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1238255 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2015 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 67758319 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3569880 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2333096 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1236783 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2333096 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1236783 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 2016 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 68039270 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3575030 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2339684 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1235345 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2339684 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1235345 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
 
 ---
 
@@ -374,12 +458,12 @@ metrics %&gt;%
   &lt;tr&gt;
    &lt;td style="text-align:left;"&gt; comb &lt;/td&gt;
    &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 5.63 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.09 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.65 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.16 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.65 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.16 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.89 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.17 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.17 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.01 &lt;/td&gt;
   &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
@@ -424,14 +508,14 @@ tbl %&gt;%
   &lt;tr&gt;
    &lt;td style="text-align:left;"&gt; comb &lt;/td&gt;
    &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 5.63 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 8.56 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 8.18 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 17.82 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 18.85 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.09 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.60 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.81 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.94 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19.94 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 20.60 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.89 &lt;/td&gt;
    &lt;td style="text-align:right;"&gt; 4.85 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 14.40 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 13.96 &lt;/td&gt;
   &lt;/tr&gt;
   &lt;tr&gt;
    &lt;td style="text-align:left;"&gt; bu &lt;/td&gt;
@@ -524,12 +608,12 @@ tbl %&gt;%
   &lt;tr&gt;
    &lt;td style="text-align:left;"&gt; comb &lt;/td&gt;
    &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 5.63 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.09 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.65 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.16 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.65 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.16 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.60 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.89 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.17 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.17 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.01 &lt;/td&gt;
   &lt;/tr&gt;
   &lt;tr&gt;
    &lt;td style="text-align:left;"&gt; bu &lt;/td&gt;
@@ -608,7 +692,8 @@ tbl %&gt;%
     - `gts()` function
 
 - Prediction intervals are not yet implemented directly in `hts`
-    - though it [looks possible to compute by hand](https://stats.stackexchange.com/questions/303176/building-the-covariance-matrix-for-hts-prediction-intervals)
+    - though it [looks possible to compute for the trace minimization method](https://stats.stackexchange.com/questions/303176/building-the-covariance-matrix-for-hts-prediction-intervals)
+    - the covariance estimator is needed to compute prediction intervals
 
 ---
 
