@@ -215,6 +215,10 @@ nps %&gt;%
 
 - Proposed by Hyndman, et al (2011) and further explored in Wickramasuriya et al (2018)
 
+- A _forecast reconciliation_ algorithm based on a GLS estimator
+    - adjusts forecasts to make them coherent
+    - requires an estimate of the covariance matrix of the errors that arise due to incoherence
+
 - advantages:
     - uses _all_ information available within the hierarchy
     - allows for correlations and interactions between series at each level of the hierarchy
@@ -231,7 +235,7 @@ nps %&gt;%
 - `\(\hat{y_h}\)` is a vector of the _h_-step-ahead base forecasts for the entire hierarchy
 - `\(S\)` is the S (summing) matrix
 - `\(\beta_h\)` is the unknown mean of the future values of the bottom level _K_
-- `\(\epsilon_h\)` is the error in the regression and has zero mean and unknown covariance matrix `\(\Sigma_h\)`
+- `\(\epsilon_h\)` is the error in the regression and has zero mean and covariance matrix `\(\Sigma_h\)`
 
 ---
 
@@ -241,11 +245,12 @@ nps %&gt;%
 
 `$$\hat{y_h} = S\beta_h + \epsilon_h$$`
 
-- If the base forecasts satisfy the hierarchical aggregation structure, then the errors should also satisfy the hierarchical aggregation structure, or `\(\epsilon_h \approx S\epsilon_{K,h}\)`, where \epsilon_{K,h} contains the forecast errors in the bottom level.
+- If the base forecasts satisfy the hierarchical aggregation structure, then the errors should also satisfy the hierarchical aggregation structure, or `\(\epsilon_h \approx S\epsilon_{K,h}\)`, where `\(\epsilon_{K,h}\)` contains the forecast errors in the bottom level.
     - Under this assumption, Hyndman et al (2011) show that the best linear unbiased estimator for `\(\beta_h\)` is
     
     `$$\hat{\beta_h} = S(S^\prime S)^{-1}S^\prime\hat{y_h}$$`
   - note, the estimator does not depend on the unknown covariance matrix `\(\Sigma_h\)`
+      - newer method in a [2018 paper](https://robjhyndman.com/publications/mint/) ("trace minimization") incorporates this covariance matrix
  
 ---
 
@@ -274,13 +279,15 @@ test  &lt;- window(nps_hts, start = 2005)
 
 ---
 
+More knobs to tune on `forecast` function [here](https://www.rdocumentation.org/packages/hts/versions/5.1.5/topics/forecast.gts).
+
 
 ```r
 nps_fcasts &lt;- forecast(
   train,
-  h = 12,                 # forecast next 12 years (2005-2016)
-  method = "comb",        # optimal combination
-  fmethod = "ets",        # exponential smoothing
+  h = 12,             # forecast horizon, next 12 years (2005-2016)
+  method = "comb",    # optimal combination, method for distributing forecasts within the hierarchy
+  fmethod = "ets",    # forecasting method used for each series, exponential smoothing, or "arima" and "rw"
   keep.fitted = TRUE,
   keep.resid = TRUE
 )
@@ -584,19 +591,24 @@ tbl %&gt;%
 - Optimal combination approach forecast performed the best on the NE region.
 
 - For regions with large variability in park-level time series, top-down approaches performed better
+    - notably, proportions of historical averages (tdgsf)
     - MW, NC
     
 - AK did not have noisy park-level data, so bottom-up method performed well
+    - remote parks, smaller numbers of visitors
 
 ---
 
 ## Other Points
+
+- use `levels` argument in `hts::plot or hts::aggts` to extract specific levels of the hierarchy 
 
 - "bottom up" and "optimal combination" methods can also be used for "grouped" time series
     - e.g. first disaggregated by geography, then by gender
     - `gts()` function
 
 - Prediction intervals are not yet implemented directly in `hts`
+    - though it [looks possible to compute by hand](https://stats.stackexchange.com/questions/303176/building-the-covariance-matrix-for-hts-prediction-intervals)
 
 ---
 
@@ -607,6 +619,8 @@ tbl %&gt;%
 - `hts` [vignette](https://cran.r-project.org/web/packages/hts/vignettes/hts.pdf)
 
 - Hyndman et al (2011) optimal combination [paper](https://robjhyndman.com/papers/Hierarchical6.pdf)
+
+- Wickramasuriya et al (2018) trace minimization [paper](https://robjhyndman.com/papers/mint.pdf)
     </textarea>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
 <script>var slideshow = remark.create({
