@@ -58,13 +58,14 @@ For any time _t_, the observations of the bottom-level series will aggregate to 
 
 ![](s-matrix.png)
 
+- dictates how the bottom level series are aggregated, consistent with the hierarchical structure
 
 ---
 
 ## Methods
 
-- Top-down
 - Bottom-up
+- Top-down
 - Middle-out
 - Optimal Combination
 
@@ -138,6 +139,8 @@ nps %>%
 - Advantage: no information is lost due to aggregation
 - Disadvantage: bottom-level data can be noisy and more challenging to forecast
 
+- `method = "bu"`
+
 ---
 
 ## Top-down method
@@ -148,6 +151,7 @@ nps %>%
     - useful with low count data
 - Disadvantage: loss of information due to aggregation
     - unable to capture individual series characteristics (e.g. special events)
+    - tend to produce less accurate forecasts at lower levels of the hierarchy than bottom-up
 
 - Several methods (20+) have been developed to disaggregate
     - average historical proportions
@@ -161,6 +165,9 @@ nps %>%
 - Each proportion, $p_{j}$ reflects the average of the historical proportions of the bottom-level series $y_{j,t}$ over the period _t_ = 1,..., _T_ relative to the total aggregate $y_{t}$
 
 $$p_{j} = \frac{1}{T}\sum_{t=1}^{T}{\frac{y_{j,t}}{y_{t}}}$$
+
+- Introduced in Gross & Sohl (1990)
+    - `method = "tdgsa"` for "top-down Gross-Sohl method A"
   
 ---
 
@@ -169,6 +176,9 @@ $$p_{j} = \frac{1}{T}\sum_{t=1}^{T}{\frac{y_{j,t}}{y_{t}}}$$
 - Each proportion $p_{j}$ captures the average historical value of the bottom-level series $y{j,t}$ relative to the average value of the total aggregate $y_{t}$
 
 $$p_{j} = \sum_{t=1}^{T}{\frac{y_{j,t}}{T}} / \sum_{t=1}^{T}{\frac{y_{t}}{T}}$$
+
+- Introduced in Gross & Sohl (1990)
+    - `method = "tdgsf"` for "top-down Gross-Sohl method F"
 
 ---
 
@@ -181,6 +191,8 @@ $$p_{j} = \sum_{t=1}^{T}{\frac{y_{j,t}}{T}} / \sum_{t=1}^{T}{\frac{y_{t}}{T}}$$
     - these are the _forecasted proportions_, which are used to disaggregate and generate revised forecasts
 3. for a _K_-level hierarchy, step 2 is repeated for each node going from top to bottom
 
+- `method = "tdfp"`
+
 ---
 
 ## Middle-out method
@@ -188,13 +200,15 @@ $$p_{j} = \sum_{t=1}^{T}{\frac{y_{j,t}}{T}} / \sum_{t=1}^{T}{\frac{y_{t}}{T}}$$
 - Combines bottom-up and top-down approaches
     1. "middle level" is chosen and base forecasts are generated for all the series of this level and below
     2. for series above the middle level, forecasts are generated using bottom up approach by aggregating the middle level base forecasts upwards
-    3. for series below the middle level, revised forecasts are generated using a top-down approach
+    3. for series below the middle level, revised forecasts are generated using a top-down approach (`method = "tdfp"` in `hts`)
+
+- `method = "mo"`
 
 ---
   
 ## Optimal Combination
 
-- Proposed by Hyndman, et al (2011)
+- Proposed by Hyndman, et al (2011) and further explored in Wickramasuriya et al (2018)
 
 - advantages:
     - uses _all_ information available within the hierarchy
@@ -205,9 +219,32 @@ $$p_{j} = \sum_{t=1}^{T}{\frac{y_{j,t}}{T}} / \sum_{t=1}^{T}{\frac{y_{t}}{T}}$$
 
 ## Optimal Combination
 
+- General idea: represent the _h_-step-ahead base forecasts for the entire hierarchy by a linear regression model
+
+$$\hat{y_h} = S\beta_h + \epsilon_h$$
+
+- $\hat{y_h}$ is a vector of the _h_-step-ahead base forecasts for the entire hierarchy
+- $S$ is the S (summing) matrix
+- $\beta_h$ is the unknown mean of the future values of the bottom level _K_
+- $\epsilon_h$ is the error in the regression and has zero mean and unknown covariance matrix $\Sigma_h$
+
 ---
 
-Let's try to forecast the number of visitors to the national parks over the next five years. First convert the data to an `hts` object and split into train/test sets.
+## Optimal Combination
+
+- General idea: represent the _h_-step-ahead base forecasts for the entire hierarchy by a linear regression model
+
+$$\hat{y_h} = S\beta_h + \epsilon_h$$
+
+- If the base forecasts satisfy the hierarchical aggregation structure, then the errors should also satisfy the hierarchical aggregation structure, or $\epsilon_h \approx S\epsilon_{K,h}$, where \epsilon_{K,h} contains the forecast errors in the bottom level.
+    - Under this assumption, Hyndman et al (2011) show that the best linear unbiased estimator for $\beta_h$ is
+    
+    $$\hat{\beta_h} = S(S^\prime S)^{-1}S^\prime\hat{y_h}$$
+  - note, the estimator does not depend on the unknown covariance matrix $\Sigma_h$
+ 
+---
+
+Let's try to forecast the number of visitors to the national parks. First convert the data to an `hts` object and split into train/test sets.
 
 ```{r}
 
@@ -349,10 +386,22 @@ tbl %>%
 
 ---
 
-## Other Methods
+## Other Points
 
-- Trace minimization 
-    - Proposed by Hyndman, et al (2016)
-    - `hts::MinT()` function
+- "bottom up" and "optimal combination" methods can also be used for "grouped" time series
+    - e.g. first disaggregated by geography, then by gender
+    - `gts()` function
+
+- Prediction intervals are not yet implemented directly in `hts`
+
+---
+
+## References
+
+- Hyndman's Forecasting Principles and Practice [book](https://otexts.org/fpp2/hierarchical.html)
+
+- `hts` [vignette](https://cran.r-project.org/web/packages/hts/vignettes/hts.pdf)
+
+- Hyndman et al (2011) optimal combination [paper](https://robjhyndman.com/papers/Hierarchical6.pdf)
 
 
