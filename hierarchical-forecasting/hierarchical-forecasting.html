@@ -13,7 +13,7 @@ class: center, middle, inverse, title-slide
 
 # Hierarchical Time Series Forecasting
 ### Caleb Scheidel
-### 2018/11/30
+### 2018/12/03
 
 ---
 
@@ -136,15 +136,6 @@ nps %&gt;%
 
 ---
 
-## `hts` package
-
-
-```r
-library(hts)
-```
-
----
-
 ## Bottom-up method
 
 - Forecast bottom-level series, then use aggregation (simple addition) to obtain forecasts at higher levels
@@ -174,9 +165,7 @@ library(hts)
 
 - Each proportion, `\(p_{j}\)` reflects the average of the historical proportions of the bottom-level series `\(y_{j,t}\)` over the period _t_ = 1,..., _T_ relative to the total aggregate `\(y_{t}\)`
 
-$$
-p_{j} = \frac{1}{T}\sum_{t=1}^{T}{\frac{y_{j,t}}{y_{t}}}
-$$
+`$$p_{j} = \frac{1}{T}\sum_{t=1}^{T}{\frac{y_{j,t}}{y_{t}}}$$`
   
 ---
 
@@ -184,9 +173,7 @@ $$
         
 - Each proportion `\(p_{j}\)` captures the average historical value of the bottom-level series `\(y{j,t}\)` relative to the average value of the total aggregate `\(y_{t}\)`
 
-$$
-p_{j} = \sum_{t=1}^{T}{\frac{y_{j,t}}{T}} / \sum_{t=1}^{T}{\frac{y_{t}}{T}}
-$$
+`$$p_{j} = \sum_{t=1}^{T}{\frac{y_{j,t}}{T}} / \sum_{t=1}^{T}{\frac{y_{t}}{T}}$$`
 
 ---
 
@@ -225,10 +212,12 @@ $$
 
 ---
 
-Setting up the `hts` object.
+Let's try to forecast the number of visitors to the national parks over the next five years. First convert the data to an `hts` object and split into train/test sets.
 
 
 ```r
+library(hts)
+
 nps_ts &lt;- nps %&gt;%
   arrange(region, state) %&gt;% 
   mutate(park_code = paste0(region, state, park_code)) %&gt;% 
@@ -241,90 +230,42 @@ nps_hts &lt;- hts(nps_ts,
                characters = c(2, 2, 4))
 
 names(nps_hts$labels) &lt;- c("Total", "Region", "State", "Park")
+
+train &lt;- window(nps_hts, start = 1904, end = 2004)
+test  &lt;- window(nps_hts, start = 2005)
 ```
 
 ---
 
-Now we can forecast.
-
 
 ```r
 nps_fcasts &lt;- forecast(
-  nps_hts,
-  h = 5,                  # forecast next 5 years (2017-2021)
+  train,
+  h = 12,                 # forecast next 12 years (2005-2016)
   method = "comb",        # optimal combination
   fmethod = "ets",        # exponential smoothing
   keep.fitted = TRUE,
   keep.resid = TRUE
 )
 
-metrics &lt;- nps_fcasts %&gt;% 
-  summary() %&gt;% 
-  broom::tidy() %&gt;% 
-  rename(metric = .rownames)
-
-metrics %&gt;%
-  mutate(park = "SENCGRSM") %&gt;% 
-  select(park, metric, `Optimal Combination` = SENCGRSM)
+nps_fcasts
 ```
 
----
-
-Now we can forecast.
-
-
-```r
-hts_fcast_metrics &lt;- function(hts_obj, h, method, fmethod, park, park_name, level = 2) {
-  
-  park &lt;- enquo(park)
-  
-  nps_fcasts &lt;- forecast(
-    hts_obj,
-    h = h,
-    method = method,        
-    fmethod = fmethod,     
-    keep.fitted = TRUE,
-    keep.resid = TRUE,
-    level = level
-  )
-
-  invisible(capture.output(metrics &lt;- summary(nps_fcasts)))
-  
-  metrics &lt;- metrics %&gt;%   
-    broom::tidy() %&gt;% 
-    rename(metric = .rownames) %&gt;% 
-    mutate(park_name = park_name) %&gt;% 
-    select(park_name, metric, !!park) %&gt;%
-    spread(metric, !!park) %&gt;% 
-    mutate(method = method) %&gt;% 
-    select(park_name, method, everything())
-
-  metrics
-} 
 ```
-
----
-
-
-```r
-hts_methods  &lt;- c("bu",    "tdfp",  "comb", "mo")
-hts_fmethods &lt;- c("arima", "arima", "ets",  "ets")
-
-tbl &lt;- hts_methods %&gt;% 
-  map2_df(hts_fmethods, ~ hts_fcast_metrics(nps_hts, 5, .x, .y, SENCGRSM, "Great Smoky Mountains"))
-
-tbl %&gt;% 
-  knitr::kable()
+## Hierarchical Time Series 
+## 4 Levels 
+## Number of nodes at each level: 1 7 28 60 
+## Total number of series: 96 
+## Number of observations in each historical series: 101 
+## Number of forecasts per series: 12 
+## Top level series of forecasts: 
+## Time Series:
+## Start = 2005 
+## End = 2016 
+## Frequency = 1 
+##  [1] 64857223 65192658 65525673 65856785 66186405 66514856 66842396
+##  [8] 67169227 67495511 67821373 68146912 68472207
 ```
-
-
-
-park_name               method         MAE        MAPE       MASE          ME         MPE       RMSE
-----------------------  -------  ---------  ----------  ---------  ----------  ----------  ---------
-Great Smoky Mountains   bu        295232.8    8.382227   1.174242     -40.951   -2.452122   411902.5
-Great Smoky Mountains   tdfp      294739.3    8.862291   1.172280    7307.959   -2.587239   415141.1
-Great Smoky Mountains   comb      302983.6   10.228810   1.205070   23087.970    2.536489   423122.6
-Great Smoky Mountains   mo        304404.8   10.319153   1.210723   41336.769    2.958275   420905.5
 
 ---
 
@@ -333,7 +274,7 @@ Great Smoky Mountains   mo        304404.8   10.319153   1.210723   41336.769   
 plot(nps_fcasts, levels = c(0, 1))
 ```
 
-![](hierarchical-forecasting_files/figure-html/unnamed-chunk-10-1.png)&lt;!-- --&gt;
+![](hierarchical-forecasting_files/figure-html/unnamed-chunk-7-1.png)&lt;!-- --&gt;
 
 ---
 
@@ -342,19 +283,273 @@ plot(nps_fcasts, levels = c(0, 1))
 plot(nps_fcasts, levels = c(2, 3))
 ```
 
-![](hierarchical-forecasting_files/figure-html/unnamed-chunk-11-1.png)&lt;!-- --&gt;
+![](hierarchical-forecasting_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+
+---
+
+How'd the optimal combination forecast perform on parks in the northeast region?
+
+
+```r
+# calculate performance on test set
+metrics &lt;- nps_fcasts %&gt;% 
+  accuracy.gts(test) %&gt;% 
+  broom::tidy() %&gt;% 
+  rename(metric = .rownames) %&gt;% 
+  as_tibble() %&gt;% 
+  mutate_if(is.numeric, round, 2)
+
+metrics %&gt;% 
+  mutate(method = "comb") %&gt;% 
+  select(method, metric, Total, contains("NE")) %&gt;% 
+  filter(metric == "MAPE") %&gt;% 
+  knitr::kable("html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; method &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; metric &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; Total &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NE &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEME &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEVA &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEMEACAD &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEVASHEN &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; comb &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.63 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.09 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.65 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.16 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.65 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.16 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+Which method produces the most accurate forecasts for the NPS visitor data on the northeast region?
+
+
+
+
+```r
+hts_methods  &lt;- c("bu",    "tdgsa", "tdgsf", "tdfp",  "comb", "mo")
+hts_fmethods &lt;- c("arima", "ets",   "ets",   "ets",   "ets",  "ets")
+
+tbl &lt;- map2_df(
+  hts_methods, hts_fmethods, ~ hts_fcast_metrics(train, test, 12, .x, .y)
+)
+
+tbl %&gt;%
+  filter(metric == "MAPE") %&gt;%
+  select(method, metric, Total, AK, IM, MW, NC, NE, PW, SE) %&gt;% 
+  arrange(NE) %&gt;% knitr::kable("html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; method &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; metric &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; Total &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; AK &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; IM &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; MW &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NC &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NE &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; PW &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; SE &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; comb &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.63 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.56 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 17.82 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18.85 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.09 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4.85 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 14.40 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; bu &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.05 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.90 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.36 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 28.60 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 14.10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.22 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.08 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18.00 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; mo &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.50 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.86 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.38 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19.60 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 18.74 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.22 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4.68 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 13.40 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; tdfp &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.62 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.74 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.05 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 14.65 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 17.36 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.43 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4.75 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 14.36 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; tdgsf &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.62 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 54.88 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10.78 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.97 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.99 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 66.64 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.51 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.19 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; tdgsa &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24.75 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 58.20 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10.03 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 106.93 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 30.44 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 97.49 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 32.28 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.79 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+
+```r
+tbl %&gt;%
+  filter(metric == "MAPE") %&gt;%
+  select(method, metric, Total, contains("NE")) %&gt;% 
+  arrange(NE) %&gt;%
+  knitr::kable("html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; method &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; metric &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; Total &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NE &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEME &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEVA &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEMEACAD &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; NEVASHEN &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; comb &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.63 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.09 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.65 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.16 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.65 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.16 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; bu &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.05 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.22 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.77 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.44 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.77 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.44 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; mo &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.50 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.22 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.77 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.44 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.77 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.44 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; tdfp &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.62 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.43 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10.23 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.73 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10.23 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.73 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; tdgsf &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5.62 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 66.64 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 36.61 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 126.95 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 36.61 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 126.95 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; tdgsa &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; MAPE &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24.75 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 97.49 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 38.46 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 215.84 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 38.46 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 215.84 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
 
 ---
 
 ## Conclusions
 
-- Of the methods we examined, _____ performed the best on the NPS Visitor data.
+- Optimal combination approach forecast performed the best on the NE region.
+
+- For regions with large variability in park-level time series, top-down approaches performed better
+    - MW, NC
+    
+- AK did not have noisy park-level data, so bottom-up method performed well
 
 ---
 
 ## Other Methods
 
-- Proposed by Hyndman, et al (2016)
+- Trace minimization 
+    - Proposed by Hyndman, et al (2016)
     - `hts::MinT()` function
     </textarea>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
@@ -373,23 +568,12 @@ if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
   d.head.appendChild(s);
 })();</script>
 
-<script>
-(function() {
-  var i, text, code, codes = document.getElementsByTagName('code');
-  for (i = 0; i < codes.length;) {
-    code = codes[i];
-    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
-      text = code.textContent;
-      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
-          /^\$\$(.|\s)+\$\$$/.test(text) ||
-          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
-        code.outerHTML = code.innerHTML;  // remove <code></code>
-        continue;
-      }
-    }
-    i++;
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  tex2jax: {
+    skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
   }
-})();
+});
 </script>
 <!-- dynamically load mathjax for compatibility with self-contained -->
 <script>

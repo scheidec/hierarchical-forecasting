@@ -1,7 +1,7 @@
 ---
 title: "Hierarchical Time Series Forecasting"
 author: "Caleb Scheidel"
-date: "2018/11/30"
+date: "2018/12/03"
 output:
   xaringan::moon_reader:
     css: ["mc-xaringan.css", "mc-xaringan-fonts.css"]
@@ -131,14 +131,6 @@ nps %>%
 
 ---
 
-## `hts` package
-
-```{r}
-library(hts)
-```
-
----
-
 ## Bottom-up method
 
 - Forecast bottom-level series, then use aggregation (simple addition) to obtain forecasts at higher levels
@@ -168,9 +160,7 @@ library(hts)
 
 - Each proportion, $p_{j}$ reflects the average of the historical proportions of the bottom-level series $y_{j,t}$ over the period _t_ = 1,..., _T_ relative to the total aggregate $y_{t}$
 
-$$
-p_{j} = \frac{1}{T}\sum_{t=1}^{T}{\frac{y_{j,t}}{y_{t}}}
-$$
+$$p_{j} = \frac{1}{T}\sum_{t=1}^{T}{\frac{y_{j,t}}{y_{t}}}$$
   
 ---
 
@@ -178,9 +168,7 @@ $$
         
 - Each proportion $p_{j}$ captures the average historical value of the bottom-level series $y{j,t}$ relative to the average value of the total aggregate $y_{t}$
 
-$$
-p_{j} = \sum_{t=1}^{T}{\frac{y_{j,t}}{T}} / \sum_{t=1}^{T}{\frac{y_{t}}{T}}
-$$
+$$p_{j} = \sum_{t=1}^{T}{\frac{y_{j,t}}{T}} / \sum_{t=1}^{T}{\frac{y_{t}}{T}}$$
 
 ---
 
@@ -219,9 +207,11 @@ $$
 
 ---
 
-Setting up the `hts` object.
+Let's try to forecast the number of visitors to the national parks over the next five years. First convert the data to an `hts` object and split into train/test sets.
 
 ```{r}
+
+library(hts)
 
 nps_ts <- nps %>%
   arrange(region, state) %>% 
@@ -235,80 +225,25 @@ nps_hts <- hts(nps_ts,
                characters = c(2, 2, 4))
 
 names(nps_hts$labels) <- c("Total", "Region", "State", "Park")
+
+train <- window(nps_hts, start = 1904, end = 2004)
+test  <- window(nps_hts, start = 2005)
 ```
 
 ---
 
-Now we can forecast.
-
-```{r, results = "hide", warning = FALSE}
+```{r}
 
 nps_fcasts <- forecast(
-  nps_hts,
-  h = 5,                  # forecast next 5 years (2017-2021)
+  train,
+  h = 12,                 # forecast next 12 years (2005-2016)
   method = "comb",        # optimal combination
   fmethod = "ets",        # exponential smoothing
   keep.fitted = TRUE,
   keep.resid = TRUE
 )
 
-metrics <- nps_fcasts %>% 
-  summary() %>% 
-  broom::tidy() %>% 
-  rename(metric = .rownames)
-
-metrics %>%
-  mutate(park = "SENCGRSM") %>% 
-  select(park, metric, `Optimal Combination` = SENCGRSM)
-```
-
----
-
-Now we can forecast.
-
-```{r, results = "hide", warning = FALSE}
-
-hts_fcast_metrics <- function(hts_obj, h, method, fmethod, park, park_name, level = 2) {
-  
-  park <- enquo(park)
-  
-  nps_fcasts <- forecast(
-    hts_obj,
-    h = h,
-    method = method,        
-    fmethod = fmethod,     
-    keep.fitted = TRUE,
-    keep.resid = TRUE,
-    level = level
-  )
-
-  invisible(capture.output(metrics <- summary(nps_fcasts)))
-  
-  metrics <- metrics %>%   
-    broom::tidy() %>% 
-    rename(metric = .rownames) %>% 
-    mutate(park_name = park_name) %>% 
-    select(park_name, metric, !!park) %>%
-    spread(metric, !!park) %>% 
-    mutate(method = method) %>% 
-    select(park_name, method, everything())
-
-  metrics
-} 
-```
-
----
-
-```{r, warning = FALSE}
-
-hts_methods  <- c("bu",    "tdfp",  "comb", "mo")
-hts_fmethods <- c("arima", "arima", "ets",  "ets")
-
-tbl <- hts_methods %>% 
-  map2_df(hts_fmethods, ~ hts_fcast_metrics(nps_hts, 5, .x, .y, SENCGRSM, "Great Smoky Mountains"))
-
-tbl %>% 
-  knitr::kable()
+nps_fcasts
 ```
 
 ---
@@ -325,15 +260,99 @@ plot(nps_fcasts, levels = c(2, 3))
 
 ---
 
+How'd the optimal combination forecast perform on parks in the northeast region?
+
+```{r}
+
+# calculate performance on test set
+metrics <- nps_fcasts %>% 
+  accuracy.gts(test) %>% 
+  broom::tidy() %>% 
+  rename(metric = .rownames) %>% 
+  as_tibble() %>% 
+  mutate_if(is.numeric, round, 2)
+
+metrics %>% 
+  mutate(method = "comb") %>% 
+  select(method, metric, Total, contains("NE")) %>% 
+  filter(metric == "MAPE") %>% 
+  knitr::kable("html")
+```
+
+---
+
+Which method produces the most accurate forecasts for the NPS visitor data on the northeast region?
+
+```{r, results = "hide", warning = FALSE, echo = FALSE}
+
+hts_fcast_metrics <- function(train, test, h, method, fmethod, region) {
+  
+  nps_fcasts <- forecast(
+    train,
+    h = h,
+    method = method,        
+    fmethod = fmethod,     
+    keep.fitted = TRUE,
+    keep.resid = TRUE,
+    level = 2
+  )
+
+  # calculate performance on test set
+  metrics <- nps_fcasts %>% 
+    accuracy.gts(test) %>% 
+    broom::tidy() %>% 
+    rename(metric = .rownames) %>% 
+    as_tibble() %>% 
+    mutate_if(is.numeric, round, 2) %>% 
+    mutate(method = method) %>% 
+    select(method, metric, Total, everything())
+
+  metrics
+} 
+```
+
+```{r, warning = FALSE}
+
+hts_methods  <- c("bu",    "tdgsa", "tdgsf", "tdfp",  "comb", "mo")
+hts_fmethods <- c("arima", "ets",   "ets",   "ets",   "ets",  "ets")
+
+tbl <- map2_df(
+  hts_methods, hts_fmethods, ~ hts_fcast_metrics(train, test, 12, .x, .y)
+)
+
+tbl %>%
+  filter(metric == "MAPE") %>%
+  select(method, metric, Total, AK, IM, MW, NC, NE, PW, SE) %>% 
+  arrange(NE) %>% knitr::kable("html")
+```
+
+---
+
+```{r}
+tbl %>%
+  filter(metric == "MAPE") %>%
+  select(method, metric, Total, contains("NE")) %>% 
+  arrange(NE) %>%
+  knitr::kable("html")
+```
+
+---
+
 ## Conclusions
 
-- Of the methods we examined, _____ performed the best on the NPS Visitor data.
+- Optimal combination approach forecast performed the best on the NE region.
+
+- For regions with large variability in park-level time series, top-down approaches performed better
+    - MW, NC
+    
+- AK did not have noisy park-level data, so bottom-up method performed well
 
 ---
 
 ## Other Methods
 
-- Proposed by Hyndman, et al (2016)
+- Trace minimization 
+    - Proposed by Hyndman, et al (2016)
     - `hts::MinT()` function
 
 
